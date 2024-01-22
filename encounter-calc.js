@@ -27,10 +27,53 @@ export class EncounterCalc {
 			[2400,4900,7300,10900],
 			[2800,5700,8500,12700]
 		];
+		let crXPLookup = [
+			10,		// 0
+			25,		// 1/8
+			50,		// 1/4
+			100,	// 1/2
+			200,	// 1
+			450,	// 2
+			700,
+			1100,
+			1800,
+			2300,
+			2900,
+			3900,
+			5000,
+			5900,
+			7200,
+			8400,
+			10000,
+			11500,
+			13000,
+			15000,
+			18000,
+			20000,
+			22000,
+			25000,
+			33000,
+			41000,
+			50000,
+			62000,
+			75000,
+			90000,
+			105000,
+			120000,
+			135000,
+			155000
+		];
+		
+		function crXP(cr) {
+			if (cr <= 1)
+				return crXPLookup[Math.trunc(cr * 4)];
+			return crXPLookup[Math.trunc(cr) + 3];
+		}
 
 		let enemyNames = {};
 		let playerNames = [];
 		let neutralNames = {};
+		let friendlyNames = {};
 
 		// Use all tokens in scene by default. If tokens selected just use those.
 		let tokens = canvas.tokens.controlled;
@@ -48,21 +91,22 @@ export class EncounterCalc {
 		let characterLevels = 0;
 		
 		let neutrals = 0;
+		let friendlies = 0;
 		
 		let totalXP = 0;
 
 		for (let t of tokens) {
 			let a = t.actor;
-			/*
-				a.prepareBaseData();
-				a.prepareData();
-				a.prepareDerivedData();
-				a.prepareEmbeddedDocuments();
-			*/
+			if (!a)
+				continue;
+			a.prepareBaseData();
+			a.prepareData();
+			a.prepareDerivedData();
+			a.prepareEmbeddedDocuments();
 			switch (t.document.disposition) {
 			case 1:
 				// Friendly
-				if (a.type == 'character') {
+				if (a.type == 'character' && t.document.sight.enabled) {
 					// PC.
 					characters++;
 					let threshold = xpLookup[a.system.details.level];
@@ -71,13 +115,26 @@ export class EncounterCalc {
 					hard += threshold[2];
 					deadly += threshold[3];
 					playerNames.push(t.name);
+				} else {
+					friendlies++;
+					if (!friendlyNames[t.name])
+						friendlyNames[t.name] = 0;
+					friendlyNames[t.name]++;
 				}
 				break;
 			case -1:
 			case -2:
 				// Hostile and secret.
 				enemies++;
-				totalXP += a.system.details.xp.value;
+				let xp;
+				if (a.type == 'character') {
+					if (a.system.details.xp.value)
+						xp = a.system.details.xp.value;
+					else
+						xp = crXP(a.system.details.level/2);
+				} else
+					xp = a.system.details.xp.value;
+				totalXP += xp;
 				if (!enemyNames[t.name])
 					enemyNames[t.name] = 0;
 				enemyNames[t.name]++;
@@ -150,6 +207,12 @@ export class EncounterCalc {
 				nNames += ', ';
 			nNames += `${key}: ${neutralNames[key]}`;
 		}
+		let fNames = '';
+		for (let key in friendlyNames) {
+			if (fNames)
+				fNames += ', ';
+			fNames += `${key}: ${friendlyNames[key]}`;
+		}
 		
 		let encounterCR = '20+';
 		
@@ -162,6 +225,7 @@ export class EncounterCalc {
 		await Dialog.prompt({
 		  title: "Encounter Difficulty",
 		  content: `<p>Characters: ${characters} (${playerNames.join(', ')})</p>
+					<p>Friendly: ${friendlies} (${fNames})</p>
 					<p>Neutral: ${neutrals} (${nNames})</p>
 					<p>Enemies: ${enemies} (${names})</p>
 					<p>Total XP: ${totalXP}, Multiplier: ${encMult}, Adjusted XP: ${adjXP}</p>
