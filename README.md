@@ -1,3 +1,5 @@
+To use this click on the Actors tab, then click the Encounter Calculator button at the bottom of the Actors tab. If no tokens are selected, all tokens in the scene are assumed to be included in the calculation. If tokens are selected, only those tokens will be included in the calculation.
+
 The encounter calculator uses the tables from the Combat Encounter Difficulty section of the DMG, page 82.
 
 Tokens with the friendly disposition and actors of type "character" with token sight enabled are assumed to be characters. The sight enabled flag is used in case there are NPCs of actor type 'character'.
