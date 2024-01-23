@@ -215,7 +215,12 @@ export class EncounterCalc {
 		}
 		
 		let encounterCR = '20+';
-		
+
+		// If no characters are in the scene, assume there are 5.
+
+		if (characters == 0)
+			characters = 5;
+
 		for (let i = 1; i <= 20; i++)
 			if (adjXP < characters * xpLookup[i][2]) {
 				encounterCR = i;
