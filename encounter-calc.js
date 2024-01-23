@@ -247,6 +247,8 @@ export class EncounterCalc {
 
 
 Hooks.on("renderActorDirectory", (app, html, data) => {
+	if (!game.user.isGM)
+		return;
 
     const filterButton = $("<button id='encounter-calc-button'><i class='fas fa-hand-fist'></i></i>Encounter Calculator</button>");
     html.find(".directory-footer").append(filterButton);
