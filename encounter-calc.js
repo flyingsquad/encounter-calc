@@ -102,7 +102,7 @@ export class EncounterCalc {
 			a.prepareBaseData();
 			a.prepareData();
 			a.prepareDerivedData();
-			a.prepareEmbeddedDocuments();
+			//a.prepareEmbeddedDocuments();
 			switch (t.document.disposition) {
 			case 1:
 				// Friendly
