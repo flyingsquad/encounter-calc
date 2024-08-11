@@ -126,13 +126,13 @@ export class EncounterCalc {
 			case -2:
 				// Hostile and secret.
 				enemies++;
-				let xp;
+				let xp = 0;
 				if (a.type == 'character') {
 					if (a.system.details.xp.value)
 						xp = a.system.details.xp.value;
 					else
 						xp = crXP(a.system.details.level/2);
-				} else
+				} else if (a.system.details.xp)
 					xp = a.system.details.xp.value;
 				totalXP += xp;
 				if (!enemyNames[t.name])
