@@ -1,7 +1,7 @@
 {
   "id": "encounter-calc",
   "title": "Encounter Calculator",
-  "description": "Calculate the difficulty of a 5e encounter.",
+  "description": "Calculate the difficulty of an encounter.",
   "authors": [
     {
 		"name": "flying-squad"
@@ -9,11 +9,11 @@
   ],
   "compatibility": {
     "minimum": "9",
-    "verified": "11"
+    "verified": "12"
   },
   "esmodules": ["encounter-calc.js"],
-  "version": "1.0.3",
-  "download": "https://github.com/flyingsquad/encounter-calc/archive/refs/tags/v1.0.3.zip",
+  "version": "1.0.5",
+  "download": "https://github.com/flyingsquad/encounter-calc/archive/refs/tags/v1.0.5.zip",
   "url": "https://github.com/flyingsquad/encounter-calc",
   "manifest": "https://raw.githubusercontent.com/flyingsquad/encounter-calc/main/module.json"
 }

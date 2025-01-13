@@ -245,6 +245,274 @@ export class EncounterCalc {
 
 }
 
+export class SwadeEncounter {
+	static edges = [];
+	static hindrances = [];
+	static specialAbilities = [];
+	static powers = [];
+	static ancestralAbilities = [];
+	static staticInitialized = false;
+
+	async calcDiff() {
+	
+		let enemyNames = {};
+		let playerNames = [];
+		let neutralNames = {};
+		let friendlyNames = {};
+
+		// Use all tokens in scene by default. If tokens selected just use those.
+		let tokens = canvas.tokens.controlled;
+
+		if (tokens.length == 0)
+			tokens = canvas.tokens.children[0].children;
+
+		let characters = 0;
+		let enemies = 0;
+		let neutrals = 0;
+		let friendlies = 0;
+		let charTotal = 0;
+		let hostileTotal = 0;
+		let neutralTotal = 0;
+		let friendlyTotal = 0;
+		
+		
+		for (let t of tokens) {
+			let a = t.actor;
+			if (!a)
+				continue;
+
+			let [cv, cvDetails] = this.combatValue(a);
+
+			switch (t.document.disposition) {
+			case 1:
+				// Friendly
+				if (a.type == 'character' && t.document.sight.enabled) {
+					// PC.
+					characters++;
+					playerNames.push(t.name);
+					charTotal += cv;
+				} else {
+					friendlies++;
+					if (!friendlyNames[t.name])
+						friendlyNames[t.name] = 0;
+					friendlyNames[t.name]++;
+					friendlyTotal += cv;
+				}
+				break;
+			case -1:
+			case -2:
+				// Hostile and secret.
+				enemies++;
+				if (!enemyNames[t.name])
+					enemyNames[t.name] = 0;
+				enemyNames[t.name]++;
+				hostileTotal += cv;
+				break;
+			case 0:
+				// Neutral.
+				if (!neutralNames[t.name])
+					neutralNames[t.name] = 0;
+				neutralNames[t.name]++;
+				neutrals++;
+				neutralTotal += cv;
+				break;
+			}
+		}
+		
+		
+		let names = '';
+		for (let key in enemyNames) {
+			if (names)
+				names += ', ';
+			names += `${key}: ${enemyNames[key]}`;
+		}
+		let nNames = '';
+		for (let key in neutralNames) {
+			if (nNames)
+				nNames += ', ';
+			nNames += `${key}: ${neutralNames[key]}`;
+		}
+		let fNames = '';
+		for (let key in friendlyNames) {
+			if (fNames)
+				fNames += ', ';
+			fNames += `${key}: ${friendlyNames[key]}`;
+		}
+		
+		await Dialog.prompt({
+		  title: "Encounter Difficulty",
+		  content: `<p>Characters: CV ${charTotal} (${characters}: ${playerNames.join(', ')})</p>
+					<p>Friendly: CV ${friendlyTotal} (${friendlies}: ${fNames})</p>
+					<p>Neutral: CV ${neutralTotal} (${neutrals}: ${nNames})</p>
+					<p>Enemies: CV ${hostileTotal} (${enemies}: ${names})</p>`
+					,
+		  label: "OK",
+		  callback: (html) => { ; }
+		});
+		
+	}
+
+	combatValue(actor) {
+		const wcProbabilities = [.62, .75, .81, .85, .88, .94, .99];
+		const probabilities =   [.25, .50, .63, .70, .75, .83, .92];
+		
+		function getDieProb(actor, die) {
+			let index = (die.sides - 4) / 2;
+			if (die.modifier > 0)
+				index += Math.min(die.modifier, 2);
+			if (actor.system.wildcard)
+				return wcProbabilities[index];
+			return probabilities[index];
+		}
+
+		function getSkillProb(actor, name) {
+			let skill = actor.items.find(skill => skill.name == name);
+			if (!skill)
+				return actor.system.wildcard ? .32 : .19;
+			return getDieProb(actor, skill.system.die);
+		}
+		
+		if (actor.type != 'character' && actor.type != 'npc')
+			return 'N/A';
+		
+		let cv = 0;
+		let cvDetails = '';
+
+		let weapons  = actor.items.filter(it => it.type == 'weapon' || it.type == 'power');
+
+		// Get the potential of the most damaging weapon or power.
+
+		let maxDamage = 0;
+		
+		let s = actor.system;
+		let strength = 'd' + s.attributes.strength.die.sides;
+		if (s.attributes.strength.modifier > 0)
+			strength += `+@{s.attributes.strength.modifier}`;
+		else if (s.attributes.strength.modifier < 0)
+			strength += `@{s.attributes.strength.modifier}`;
+
+		let details = '';
+
+		for (let w of weapons) {
+			if (!w.system.damage)
+				continue;
+			let damage = w.system.damage.replace("@str", strength);
+			let dmg = damage.replaceAll(/([0-9]+)d/g, "$1*");
+			dmg = dmg.replaceAll("d", "");
+			try {
+				dmg = eval(dmg);
+			} catch (e) {
+				dmg = 0;
+			}
+			let skillProb = actor.system.wildcard ? .32 : .19;
+			const p = getSkillProb(actor, w.system.actions.trait);
+			if (p > skillProb)
+				skillProb = p;
+
+			dmg = Math.round(dmg * skillProb);
+
+			if (dmg > maxDamage) {
+				maxDamage = dmg;
+				details = `${w.name} (${w.system.actions.trait}, ${damage}): ${dmg}`;
+			}
+		}
+
+		cv += maxDamage;
+		if (cvDetails)
+			cvDetails += ', ';
+		cvDetails += details;
+
+		// Modify CV for toughness, parry and vigor.
+
+		let tough = (s.stats.toughness.value - 5);
+		if (tough > 0)
+			tough *= (1 + s.wounds.max);
+		cv += tough;
+		if (tough)
+			cvDetails += `, Toughness*Wounds ${tough}`;
+		let pp = Math.round(s.powerPoints.general.max/5)
+		if (pp) {
+			cv += pp;
+			cvDetails += `, Power Points: ${pp}`;
+		}
+
+		const parry = s.stats.parry.value - 5;
+		cv += parry;
+		if (parry)
+			cvDetails += `, Parry ${parry}`;
+		const vigor = (s.attributes.vigor.die.sides - 4) / 2 + s.attributes.vigor.die.modifier;
+		cv += vigor;
+		if (vigor)
+			cvDetails += `, Vigor ${vigor}`;
+		
+		for (let item of actor.items) {
+			let value = 0;
+			switch (item.type) {
+			case 'edge':
+				value = SwadeEncounter.edges[item.name];
+				break;
+			case 'ability':
+				value = SwadeEncounter.specialAbilities[item.name];
+				if (!value)
+					value = SwadeEncounter.specialAbilities[item.name];
+				break;
+			case 'power':
+				value = SwadeEncounter.powers[item.name];
+				break;
+			case 'hindrance':
+				value = SwadeEncounter.hindrances[item.name];
+				break;
+			}
+			if (value) {
+				cv += value;
+				cvDetails += `, ${item.name}: ${value}`;
+			}
+		}
+
+		if (s.wildcard)
+			cv *= 3;
+
+		return [cv, cvDetails];
+	}
+
+	static {
+		console.log("SwadeEncounter | loaded.");
+
+		async function getCombatValues() {
+			async function getValues(entry, arr) {
+				let fileName = "modules/htmlfilter/filters/" + entry + ".cv";
+
+				let response = await fetch(fileName);
+				if (!response.ok) {
+					return false;
+				}
+			
+				let itemList = await response.text();
+				let entries = itemList.split(/\r*\n/);
+				for (let entry of entries) {
+					let [name, value] = entry.split(/ *: */);
+					if (name && value) {
+						arr[name] = Number(value);
+					}
+				}
+			}
+
+			await getValues('Edges', SwadeEncounter.edges);
+			await getValues('SpecialAbilities', SwadeEncounter.specialAbilities);
+			await getValues('AncestralAbilities', SwadeEncounter.ancestralAbilities);
+			await getValues('Hindrances', SwadeEncounter.hindrances);
+			await getValues('Powers', SwadeEncounter.powers);
+		}
+
+		Hooks.on("init", async function() {
+			if (game.system.id == 'swade') {
+				console.log("SwadeEncounter | initialized.");
+				await getCombatValues();
+			}
+		});
+	}
+
+}
 
 Hooks.on("renderActorDirectory", (app, html, data) => {
 	if (!game.user.isGM)
@@ -255,8 +523,17 @@ Hooks.on("renderActorDirectory", (app, html, data) => {
 
     filterButton.click(async (ev) => {
 		try {
-			let ec = new EncounterCalc();
-			ec.calcDiff();
+			let ec = null;
+			switch (game.system.id) {
+			case 'dnd5e':
+				ec = new EncounterCalc();
+				ec.calcDiff();
+				break;
+			case 'swade':
+				ec = new SwadeEncounter();
+				ec.calcDiff();
+				break;
+			}
 
 		} catch (msg) {
 			ui.notifications.warn(msg);
