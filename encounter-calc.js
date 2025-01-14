@@ -366,6 +366,9 @@ export class SwadeEncounter {
 		}
 
 		function getSkillProb(actor, name) {
+			const lcname = name.toLowerCase();
+			if (actor.system.attributes[lcname])
+				return getDieProb(actor, actor.system.attributes[lcname].die);
 			let skill = actor.items.find(skill => skill.name == name);
 			if (!skill)
 				return actor.system.wildcard ? .32 : .19;
