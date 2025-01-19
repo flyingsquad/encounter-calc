@@ -12,8 +12,8 @@
     "verified": "12"
   },
   "esmodules": ["encounter-calc.js"],
-  "version": "1.0.6",
-  "download": "https://github.com/flyingsquad/encounter-calc/archive/refs/tags/v1.0.6.zip",
+  "version": "1.0.7",
+  "download": "https://github.com/flyingsquad/encounter-calc/archive/refs/tags/v1.0.7.zip",
   "url": "https://github.com/flyingsquad/encounter-calc",
   "manifest": "https://raw.githubusercontent.com/flyingsquad/encounter-calc/main/module.json"
 }

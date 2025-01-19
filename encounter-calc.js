@@ -289,7 +289,7 @@ export class SwadeEncounter {
 				if (a.type == 'character' && t.document.sight.enabled) {
 					// PC.
 					characters++;
-					playerNames.push(t.name);
+					playerNames.push(`${t.name}: ${cv}`);
 					charTotal += cv;
 				} else {
 					friendlies++;
