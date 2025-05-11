@@ -432,7 +432,7 @@ export class SwadeEncounter {
 			tough *= (1 + s.wounds.max);
 		cv += tough;
 		if (tough)
-			cvDetails += `, Toughness*Wounds ${tough}`;
+			cvDetails += `, Toughness x Wounds ${tough}`;
 		let pp = Math.round(s.powerPoints.general.max/5)
 		if (pp) {
 			cv += pp;
