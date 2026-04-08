@@ -99,10 +99,6 @@ export class EncounterCalc {
 			let a = t.actor;
 			if (!a)
 				continue;
-			a.prepareBaseData();
-			a.prepareData();
-			a.prepareDerivedData();
-			//a.prepareEmbeddedDocuments();
 			switch (t.document.disposition) {
 			case 1:
 				// Friendly
@@ -227,18 +223,21 @@ export class EncounterCalc {
 				break;
 			}
 		
-		await Dialog.prompt({
-		  title: "Encounter Difficulty",
-		  content: `<p>Characters: ${characters} (${playerNames.join(', ')})</p>
-					<p>Friendly: ${friendlies} (${fNames})</p>
-					<p>Neutral: ${neutrals} (${nNames})</p>
-					<p>Enemies: ${enemies} (${names})</p>
-					<p>Total XP: ${totalXP}, Multiplier: ${encMult}, Adjusted XP: ${adjXP}</p>
-					<p>Easy: ${easy}, Medium: ${medium}, Hard: ${hard}, Deadly: ${deadly}</p>
-					<p>Difficulty: ${diff}, Encounter CR: ${encounterCR}</p>`
-					,
-		  label: "OK",
-		  callback: (html) => { ; }
+		await foundry.applications.api.DialogV2.prompt({
+			window: {
+				title: "Encounter Difficulty"
+			},
+			content: `<p>Characters: ${characters} (${playerNames.join(', ')})</br>
+					Friendly: ${friendlies} (${fNames})</br>
+					Neutral: ${neutrals} (${nNames})</br>
+					Enemies: ${enemies} (${names})</br>
+					Total XP: ${totalXP}, Multiplier: ${encMult}, Adjusted XP: ${adjXP}</br>
+					Easy: ${easy}, Medium: ${medium}, Hard: ${hard}, Deadly: ${deadly}</br>
+					Difficulty: ${diff}, Encounter CR: ${encounterCR}</p>`,
+			ok: {
+				label: "OK",
+				callback: (event, button, dialog) => { ; }
+			}
 		});
 		
 	}
@@ -338,16 +337,19 @@ export class SwadeEncounter {
 				fNames += ', ';
 			fNames += `${key}: ${friendlyNames[key]}`;
 		}
-		
-		await Dialog.prompt({
-		  title: "Encounter Difficulty",
-		  content: `<p>Characters: CV ${charTotal} (${characters}: ${playerNames.join(', ')})</p>
-					<p>Friendly: CV ${friendlyTotal} (${friendlies}: ${fNames})</p>
-					<p>Neutral: CV ${neutralTotal} (${neutrals}: ${nNames})</p>
-					<p>Enemies: CV ${hostileTotal} (${enemies}: ${names})</p>`
-					,
-		  label: "OK",
-		  callback: (html) => { ; }
+
+		await foundry.applications.api.DialogV2.prompt({
+			window: {
+				title: "Encounter Difficulty"
+			},
+			content: `<p>Characters: CV ${charTotal} (${characters}: ${playerNames.join(', ')})</br>
+					Friendly: CV ${friendlyTotal} (${friendlies}: ${fNames})</br>
+					Neutral: CV ${neutralTotal} (${neutrals}: ${nNames})</br>
+					Enemies: CV ${hostileTotal} (${enemies}: ${names})</p>`,
+			ok: {
+				label: "OK",
+				callback: (event, button, dialog) => { ; }
+			}
 		});
 		
 	}
@@ -373,6 +375,13 @@ export class SwadeEncounter {
 			if (!skill)
 				return actor.system.wildcard ? .32 : .19;
 			return getDieProb(actor, skill.system.die);
+		}
+		
+		function cat(s, str) {
+			let rv = s;
+			if (str !== '' && rv !== '')
+				rv += ', ';
+			return rv + str;
 		}
 		
 		if (actor.type != 'character' && actor.type != 'npc')
@@ -421,9 +430,7 @@ export class SwadeEncounter {
 		}
 
 		cv += maxDamage;
-		if (cvDetails)
-			cvDetails += ', ';
-		cvDetails += details;
+		cvDetails = cat(cvDetails, details);
 
 		// Modify CV for toughness, parry and vigor.
 
@@ -432,21 +439,21 @@ export class SwadeEncounter {
 			tough *= (1 + s.wounds.max);
 		cv += tough;
 		if (tough)
-			cvDetails += `, Toughness x Wounds ${tough}`;
+			cvDetails = cat(cvDetails, `Toughness x Wounds ${tough}`);
 		let pp = Math.round(s.powerPoints.general.max/5)
 		if (pp) {
 			cv += pp;
-			cvDetails += `, Power Points: ${pp}`;
+			cvDetails = cat(cvDetails, `Power Points: ${pp}`);
 		}
 
 		const parry = s.stats.parry.value - 5;
 		cv += parry;
 		if (parry)
-			cvDetails += `, Parry ${parry}`;
+			cvDetails = cat(cvDetails, `Parry ${parry}`);
 		const vigor = (s.attributes.vigor.die.sides - 4) / 2 + s.attributes.vigor.die.modifier;
 		cv += vigor;
 		if (vigor)
-			cvDetails += `, Vigor ${vigor}`;
+			cvDetails = cat(cvDetails, `Vigor ${vigor}`);
 		
 		for (let item of actor.items) {
 			let value = 0;
@@ -468,7 +475,7 @@ export class SwadeEncounter {
 			}
 			if (value) {
 				cv += value;
-				cvDetails += `, ${item.name}: ${value}`;
+				cvDetails = cat(cvDetails, `${item.name}: ${value}`);
 			}
 		}
 
@@ -517,30 +524,34 @@ export class SwadeEncounter {
 
 }
 
-Hooks.on("renderActorDirectory", (app, html, data) => {
-	if (!game.user.isGM)
-		return;
-
-    const filterButton = $("<button id='encounter-calc-button'><i class='fas fa-hand-fist'></i></i>Encounter Calculator</button>");
-    html.find(".directory-footer").append(filterButton);
-
-    filterButton.click(async (ev) => {
-		try {
-			let ec = null;
-			switch (game.system.id) {
-			case 'dnd5e':
-				ec = new EncounterCalc();
-				ec.calcDiff();
-				break;
-			case 'swade':
-				ec = new SwadeEncounter();
-				ec.calcDiff();
-				break;
+function documentContextOptions(app, options) {
+    options.push({
+        name: `Encounter Calculator`,
+        icon: '<i class="fas fa-hand-fist"></i>',
+        condition: () => game.user.isGM,
+        callback: async (li) =>  {
+            const entry = app.collection.get(li.dataset.entryId);
+            if (entry) {
+				let ec = null;
+				switch (game.system.id) {
+				case 'dnd5e':
+					ec = new EncounterCalc();
+					ec.calcDiff();
+					break;
+				case 'swade':
+					ec = new SwadeEncounter();
+					ec.calcDiff();
+					break;
+				}
 			}
-
-		} catch (msg) {
-			ui.notifications.warn(msg);
-		}
+        }
     });
-});
+}
+
+const hooknames = [
+    "getActorContextOptions"
+];
+
+for (const hook of hooknames)
+    Hooks.on(hook, documentContextOptions);
 
